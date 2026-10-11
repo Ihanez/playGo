@@ -1,0 +1,1 @@
+{"name":"cinejuntos","private":true,"workspaces":["packages/*","apps/*"],"scripts":{"dev:server":"npm run dev -w @cinejuntos/server","dev:web":"npm run dev -w @cinejuntos/web","test":"npm test -w @cinejuntos/server"}}
