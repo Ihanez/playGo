@@ -5,7 +5,7 @@ export const SYNC = { DEADZONE: 0.2, SEEK_THRESHOLD: 2, RATE_NUDGE: 0.05 };
 export const EV = {
   CREATE: "room:create", JOIN: "room:join", ROOM: "room:update",
   CMD: "playback:cmd", GET: "playback:get", STATE: "playback:state",
-  FILE: "file:info", PING: "time:ping",
+  FILE: "file:info", PING: "time:ping", SIGNAL: "webrtc:signal", SHARE: "share:set",
 } as const;
 
 export const joinSchema = z.object({
@@ -30,6 +30,15 @@ export type FileInfo = z.infer<typeof fileInfoSchema>;
 export type PlaybackCmd = z.infer<typeof cmdSchema>;
 export interface PlaybackState { seq: number; playing: boolean; mediaTime: number; rate: number; serverTime: number }
 export interface RoomView {
-  code: string; you: string; match: boolean | null;
+  code: string; you: string; match: boolean | null; sharer: string | null;
   seats: { id: string; name: string; connected: boolean; hasFile: boolean }[];
 }
+
+export const signalSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("description"), description: z.object({ type: z.enum(["offer", "answer"]), sdp: z.string().max(100_000) }) }),
+  z.object({ kind: z.literal("candidate"), candidate: z.object({
+    candidate: z.string().max(2000), sdpMid: z.string().nullable().optional(),
+    sdpMLineIndex: z.number().int().nullable().optional(), usernameFragment: z.string().nullable().optional() }) }),
+]);
+export type Signal = z.infer<typeof signalSchema>;
+export const shareSchema = z.object({ on: z.boolean() });

@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { EV, type RoomView } from "@cinejuntos/shared";
 import { getSocket } from "../../../lib/socket";
 import Player from "../../../components/Player";
+import ScreenShare from "../../../components/ScreenShare";
 
 const MSG: Record<string, string> = {
   NOT_FOUND: "La sala no existe o expiró.", BAD_SECRET: "El enlace no es válido.",
@@ -19,15 +20,17 @@ export default function RoomPage() {
   const [connected, setConnected] = useState(true);
   const [room, setRoom] = useState<RoomView | null>(null);
   const [error, setError] = useState<string>();
+  const [ice, setIce] = useState<RTCIceServer[]>([]);
+  const [tab, setTab] = useState<"cine" | "pantalla">("cine");
 
   useEffect(() => {
     if (!started) return;
     const key = `cj-${code}`;
     const join = () => socket.emit(EV.JOIN,
       { code, secret: window.location.hash.slice(1), name, token: sessionStorage.getItem(key) ?? undefined },
-      (res: { ok: boolean; token?: string; error?: string }) => {
+      (res: { ok: boolean; token?: string; error?: string; iceServers?: RTCIceServer[] }) => {
         if (!res.ok) { setError(MSG[res.error ?? ""] ?? "No se pudo entrar."); setStarted(false); return; }
-        sessionStorage.setItem(key, res.token!); setJoined(true); setConnected(true);
+        sessionStorage.setItem(key, res.token!); setIce(res.iceServers ?? []); setJoined(true); setConnected(true);
       });
     const onRoom = (r: RoomView) => setRoom(r);
     const onDown = () => setConnected(false);
@@ -35,6 +38,8 @@ export default function RoomPage() {
     socket.connected ? join() : socket.connect();
     return () => { socket.off("connect", join); socket.off("disconnect", onDown); socket.off(EV.ROOM, onRoom); };
   }, [started]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => { if (room?.sharer && room.sharer !== room.you) setTab("pantalla"); }, [room?.sharer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!joined) {
     return (
@@ -66,7 +71,16 @@ export default function RoomPage() {
       </header>
       {!connected && <p role="status" className="mt-3 text-sm text-amber-400">Reconectando con el servidor…</p>}
       {room && room.seats.length < 2 && <p className="mt-3 text-sm text-zinc-400">Comparte el enlace de esta página con la otra persona.</p>}
-      <Player socket={socket} match={room?.match ?? null} />
+      <div role="tablist" className="mt-5 flex gap-2">
+        {(["cine", "pantalla"] as const).map((t) => (
+          <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
+            className={`rounded-full px-4 py-1.5 text-sm ${tab === t ? "bg-violet-600" : "border border-zinc-700"}`}>
+            {t === "cine" ? "Modo Cine" : "Compartir pantalla"}
+          </button>
+        ))}
+      </div>
+      <div className={tab === "cine" ? "" : "hidden"}><Player socket={socket} match={room?.match ?? null} /></div>
+      {room && <div className={tab === "pantalla" ? "" : "hidden"}><ScreenShare socket={socket} room={room} iceServers={ice} /></div>}
     </main>
   );
 }

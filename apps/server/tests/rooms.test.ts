@@ -50,3 +50,25 @@ describe("RoomManager", () => {
     expect(m.view(m.get(code)!, a.seat.id).match).toBe(false);
   });
 });
+
+describe("compartir pantalla y señalización", () => {
+  it("permite un solo sharer y lo libera al desconectarse", () => {
+    const { m, code, secret } = setup();
+    const a = m.join(code, secret, "A", "s1"); const b = m.join(code, secret, "B", "s2");
+    if (!a.ok || !b.ok) throw new Error();
+    expect(m.setSharer(code, "s1", true)?.sharer).toBe(a.seat.id);
+    expect(m.setSharer(code, "s2", true)).toBeUndefined();
+    expect(m.setSharer(code, "s2", false)?.sharer).toBe(a.seat.id);
+    m.leave("s1");
+    expect(m.get(code)!.sharer).toBeNull();
+    expect(m.setSharer(code, "s2", true)?.sharer).toBe(b.seat.id);
+  });
+  it("la señalización solo llega al otro participante de la misma sala", () => {
+    const { m, code, secret } = setup();
+    m.join(code, secret, "A", "s1"); m.join(code, secret, "B", "s2");
+    expect(m.peerSocket(code, "s1")).toBe("s2");
+    expect(m.peerSocket(code, "intruso")).toBeUndefined();
+    m.leave("s2");
+    expect(m.peerSocket(code, "s1")).toBeUndefined();
+  });
+});
