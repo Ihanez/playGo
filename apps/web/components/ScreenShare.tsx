@@ -61,9 +61,12 @@ export default function ScreenShare({ socket, room, iceServers }: { socket: Sock
 
   useEffect(() => {
     const onSignal = (m: Signal) => {
-      const r = roomRef.current;
-      if (!r.sharer || r.sharer === r.you) return;   // solo recibimos si el otro está compartiendo
-      (peer.current ?? makePeer()).handle(m);
+      // Quien comparte YA tiene su peer y debe recibir la respuesta y los candidatos del otro.
+      // Quien mira crea el peer al llegar la oferta (sin depender de que React ya haya
+      // actualizado room.sharer, que puede ir un paso por detrás de la señal).
+      const isOffer = m.kind === "description" && m.description.type === "offer";
+      const p = peer.current ?? (isOffer ? makePeer() : null);
+      p?.handle(m);
     };
     socket.on(EV.SIGNAL, onSignal);
     return () => { socket.off(EV.SIGNAL, onSignal); teardown(); };
